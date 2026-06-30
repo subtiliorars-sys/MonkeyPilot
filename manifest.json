@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Chrome Agent Extension",
+  "name": "MonkeyPilot",
   "version": "1.0.0",
-  "description": "An AI browser agent that can group tabs, navigate, script actions, and run prompt queues.",
+  "description": "An AI-powered browser co-pilot by CodeMonkeys that handles tabs, automates workflows, and evades bot detection.",
   "permissions": [
     "sidePanel",
     "tabs",
