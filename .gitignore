@@ -1,0 +1,8 @@
+# .gitignore for ChromeAgentExtension
+live_test_logs.json
+*.log
+node_modules/
+.DS_Store
+Thumbs.db
+.env
+config.local.json

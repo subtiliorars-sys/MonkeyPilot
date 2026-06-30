@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Agent Bot-Detection Playground</title>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: sans-serif;
+      padding: 40px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 20px;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 10px;
+      background-color: #020617;
+      border: 1px solid #334155;
+      color: #fff;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #fbbf24;
+      color: #000;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+    }
+    button:hover {
+      background-color: #f59e0b;
+    }
+    /* Honeypot hidden trap */
+    .hidden-field {
+      opacity: 0;
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 0;
+      width: 0;
+      z-index: -1;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 8px;
+      font-weight: bold;
+      display: none;
+    }
+    .success {
+      background-color: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+      color: #34d399;
+    }
+    .failed {
+      background-color: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+      color: #f87171;
+    }
+    ul {
+      padding-left: 20px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🤖 Bot-Detection Playground</h1>
+  <p>Test the Chrome Agent's bot-evasion features against common form protection methods.</p>
+
+  <div class="card">
+    <h3>Red-Teaming Security Rules Active:</h3>
+    <ul>
+      <li><strong>Honeypot Trap:</strong> Hidden input field must remain empty (bots often auto-fill all inputs).</li>
+      <li><strong>Coordinate Check:</strong> Form submission clicks must have valid screen coordinates (clientX / clientY cannot be 0).</li>
+      <li><strong>Keystroke Tracker:</strong> Text inputs must be typed key-by-key (keydown, input, keyup events are tracked). Fails if values are pasted all at once.</li>
+      <li><strong>Speed Limit Check:</strong> Typing speed is tracked. Fails if typing occurs instantaneously (must take > 0.5 seconds).</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <form id="test-form" onsubmit="event.preventDefault(); validateForm();">
+      
+      <!-- Honeypot Field -->
+      <div class="hidden-field">
+        <label for="honeypot">Leave blank</label>
+        <input type="text" id="honeypot" name="honeypot" tabindex="-1" autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="Type agent_user">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Type password123">
+      </div>
+
+      <button type="submit" id="btn-submit">Submit Form</button>
+    </form>
+
+    <div id="result-box" class="result"></div>
+  </div>
+
+  <script>
+    // Event listeners to track keystroke counts
+    let usernameKeys = 0;
+    let passwordKeys = 0;
+    let typeStart = null;
+
+    const trackKeys = (e) => {
+      if (!typeStart) typeStart = Date.now();
+      if (e.target.id === 'username') usernameKeys++;
+      if (e.target.id === 'password') passwordKeys++;
+    };
+
+    document.getElementById('username').addEventListener('keydown', trackKeys);
+    document.getElementById('password').addEventListener('keydown', trackKeys);
+
+    let submitClickX = 0;
+    let submitClickY = 0;
+    document.getElementById('btn-submit').addEventListener('click', (e) => {
+      submitClickX = e.clientX;
+      submitClickY = e.clientY;
+    });
+
+    function validateForm() {
+      const honeypotVal = document.getElementById('honeypot').value;
+      const usernameVal = document.getElementById('username').value;
+      const passwordVal = document.getElementById('password').value;
+      const resultBox = document.getElementById('result-box');
+
+      resultBox.style.display = 'block';
+      resultBox.className = 'result';
+
+      // 1. Honeypot check
+      if (honeypotVal) {
+        resultBox.textContent = "❌ Failed: Honeypot field was filled. Bot detected!";
+        resultBox.classList.add('failed');
+        return;
+      }
+
+      if (!usernameVal || !passwordVal) {
+        resultBox.textContent = "⚠️ Please fill in all fields.";
+        resultBox.classList.add('failed');
+        return;
+      }
+
+      // 2. Click Coordinates check
+      if (submitClickX === 0 && submitClickY === 0) {
+        resultBox.textContent = "❌ Failed: Click event had coordinates (0, 0). Standard programmatic click detected!";
+        resultBox.classList.add('failed');
+        return;
+      }
+
+      // 3. Keystroke Count check
+      if (usernameKeys < usernameVal.length || passwordKeys < passwordVal.length) {
+        resultBox.textContent = `❌ Failed: Text was pasted/injected. (Username keys: ${usernameKeys}/${usernameVal.length}, Password keys: ${passwordKeys}/${passwordVal.length})`;
+        resultBox.classList.add('failed');
+        return;
+      }
+
+      // 4. Speed Check
+      const typeTime = Date.now() - typeStart;
+      if (typeTime < 500) {
+        resultBox.textContent = `❌ Failed: Typing was too fast (${typeTime}ms). Non-human script detected!`;
+        resultBox.classList.add('failed');
+        return;
+      }
+
+      resultBox.textContent = `🎉 Success: Passed all bot checks! Username "${usernameVal}" submitted successfully in ${typeTime}ms. (Click coordinates: ${Math.round(submitClickX)}, ${Math.round(submitClickY)})`;
+      resultBox.classList.add('success');
+    }
+  </script>
+</body>
+</html>

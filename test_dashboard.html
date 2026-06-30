@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Agent Test Dashboard</title>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: sans-serif;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 20px;
+      margin-bottom: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card h3 {
+      margin-top: 0;
+      color: #fbbf24;
+    }
+    .card p {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+    .btn {
+      background-color: #3b82f6;
+      color: #fff;
+      text-decoration: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 10px;
+      display: inline-block;
+    }
+    .btn:hover {
+      background-color: #2563eb;
+    }
+    .btn-gold {
+      background-color: #fbbf24;
+      color: #000;
+    }
+    .btn-gold:hover {
+      background-color: #d97706;
+    }
+    .status-badge {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 9999px;
+      font-weight: bold;
+    }
+    .status-active {
+      background-color: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h1>🐒 Chrome Agent Dashboard</h1>
+      <p style="color: #94a3b8; margin: 4px 0 0 0;">Launch multiple tabs and run agent smoke-tests simultaneously.</p>
+    </div>
+    <span class="status-badge status-active">Extension Active</span>
+  </div>
+
+  <div class="grid">
+    <!-- Local Red-Team Form -->
+    <div class="card">
+      <div>
+        <h3>1. Local Bot-Detection Form</h3>
+        <p>A locally-hosted sandbox containing honeypots, keystroke count checkers, timing speed limit locks, and click coordinate validators.</p>
+      </div>
+      <a href="test_playground.html" target="_blank" class="btn btn-gold">Open Local Playground ↗</a>
+    </div>
+
+    <!-- Swag Labs -->
+    <div class="card">
+      <div>
+        <h3>2. Swag Labs (E-Commerce)</h3>
+        <p>A full mock web store containing shopping carts, catalog items, sorting menus, and payment submit screens. Great for testing multi-step workflows.</p>
+      </div>
+      <a href="https://www.saucedemo.com/" target="_blank" class="btn">Open Swag Labs ↗</a>
+    </div>
+
+    <!-- Heroku Elements -->
+    <div class="card">
+      <div>
+        <h3>3. The Internet Components</h3>
+        <p>A collection of single-page UI components including dynamic selectors, nested iframes, nested dropdowns, and keypress tracking logs.</p>
+      </div>
+      <a href="https://the-internet.herokuapp.com/" target="_blank" class="btn">Open UI Elements ↗</a>
+    </div>
+
+    <!-- Quotes Scraper -->
+    <div class="card">
+      <div>
+        <h3>4. Quotes to Scrape</h3>
+        <p>A static/dynamic content sandbox containing pagination links and custom login authorization pages.</p>
+      </div>
+      <a href="http://quotes.toscrape.com/" target="_blank" class="btn">Open Quotes Page ↗</a>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 20px;">
+    <h3>Multi-Tab Concurrent Testing Strategy</h3>
+    <p>Since the Chrome Agent runs inside a persistent window-level sidepanel, you can open any of the targets above in new tabs simultaneously. Simply queue multiple prompts targeting different pages and watch the agent navigate and automate them sequentially!</p>
+  </div>
+
+</body>
+</html>

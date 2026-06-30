@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome Agent Extension",
+  "version": "1.0.0",
+  "description": "An AI browser agent that can group tabs, navigate, script actions, and run prompt queues.",
+  "permissions": [
+    "sidePanel",
+    "tabs",
+    "tabGroups",
+    "scripting",
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open Side Panel"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["stealth.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    }
+  ]
+}
