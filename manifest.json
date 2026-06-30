@@ -20,8 +20,12 @@
   "side_panel": {
     "default_path": "sidepanel.html"
   },
+  "icons": {
+    "128": "monkeypilot_icon.png"
+  },
   "action": {
-    "default_title": "Open Side Panel"
+    "default_title": "Open Side Panel",
+    "default_icon": "monkeypilot_icon.png"
   },
   "content_scripts": [
     {
