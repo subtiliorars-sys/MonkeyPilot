@@ -507,6 +507,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       `;
       
       const imgPath = agent.image || 'assets/monkey_cyan.png';
+      if (imgPath.includes("cyan")) {
+        el.classList.add("style-cyan");
+      } else if (imgPath.includes("magenta")) {
+        el.classList.add("style-magenta");
+      } else if (imgPath.includes("gold")) {
+        el.classList.add("style-gold");
+      }
+
       getTransparentImage(imgPath).then(transparentUrl => {
         const sprite = el.querySelector(".monkey-sprite");
         if (sprite) {
@@ -993,4 +1001,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.warn("Failed to sync log to server:", err);
     }
   }
+
+  // Poll state to dynamically sync the 'working' class for active running agent
+  setInterval(() => {
+    const agentItems = agentsListContainer.querySelectorAll(".agent-item");
+    agentItems.forEach((el, index) => {
+      const isCurrentlyWorking = (index === activeAgentIndex && isRunning);
+      if (isCurrentlyWorking && !el.classList.contains("working")) {
+        el.classList.add("working");
+      } else if (!isCurrentlyWorking && el.classList.contains("working")) {
+        el.classList.remove("working");
+      }
+    });
+  }, 100);
 });
