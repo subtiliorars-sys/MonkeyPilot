@@ -450,7 +450,7 @@ Output ONLY the exact chosen model ID string (e.g. google/gemini-2.5-flash) and 
               }
             });
             const textContent = results[0]?.result || "";
-            resultText = `Read page content (recursive DOM). Excerpt:\n"${textContent.slice(0, 12000)}..."`;
+            resultText = `Read page content (recursive DOM). Excerpt:\n"${textContent.slice(0, 100000)}..."`;
           } catch(err) {
             resultText = `Failed to read page content: ${err.message}. (The active page may be displaying a network/404 error page, loading, or not accessible)`;
           }
@@ -711,7 +711,7 @@ Output ONLY the exact chosen model ID string (e.g. google/gemini-2.5-flash) and 
           throw new Error(`GitHub API error (${response.status}): ${typeof parsed === "object" ? JSON.stringify(parsed) : parsed}`);
         }
 
-        resultText = `GitHub API Response (${response.status}): ` + (typeof parsed === "object" ? JSON.stringify(parsed).slice(0, 25000) : String(parsed).slice(0, 25000));
+        resultText = `GitHub API Response (${response.status}): ` + (typeof parsed === "object" ? JSON.stringify(parsed).slice(0, 500000) : String(parsed).slice(0, 500000));
       }
       else if (plan.action === "spawn_subagent") {
         this.log(`\n🤖 [Spawning Subagent]: "${plan.subagent_prompt}"`);
