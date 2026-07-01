@@ -942,6 +942,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function resetAgentSession() {
     isRunning = false;
     promptQueue = []; // Reset queue
+    promptInput.value = ""; // Clear input textarea
     planPanel.classList.add("hidden");
     btnKill.classList.add("hidden");
     btnStart.innerHTML = "↑";
