@@ -711,7 +711,7 @@ Output ONLY the exact chosen model ID string (e.g. google/gemini-2.5-flash) and 
           throw new Error(`GitHub API error (${response.status}): ${typeof parsed === "object" ? JSON.stringify(parsed) : parsed}`);
         }
 
-        resultText = `GitHub API Response (${response.status}): ` + (typeof parsed === "object" ? JSON.stringify(parsed).slice(0, 1000) : String(parsed).slice(0, 1000));
+        resultText = `GitHub API Response (${response.status}): ` + (typeof parsed === "object" ? JSON.stringify(parsed).slice(0, 25000) : String(parsed).slice(0, 25000));
       }
       else if (plan.action === "spawn_subagent") {
         this.log(`\n🤖 [Spawning Subagent]: "${plan.subagent_prompt}"`);
