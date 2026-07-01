@@ -5,21 +5,24 @@
   <title>MonkeyPilot Panel</title>
   <style>
     :root {
-      --bg-color: #0f172a;
-      --panel-bg: #1e293b;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
+      --bg-color: #0b0f19;
+      --panel-bg: #151f32;
+      --text-main: #f1f5f9;
+      --text-muted: #64748b;
       --accent-gold: #fbbf24;
       --accent-gold-hover: #f59e0b;
       --accent-indigo: #6366f1;
       --accent-indigo-hover: #4f46e5;
-      --border-color: #334155;
+      --accent-emerald: #10b981;
+      --border-color: #1e293b;
+      --chat-user-bg: #4f46e5;
+      --chat-agent-bg: #1e293b;
     }
 
     body {
       margin: 0;
-      padding: 12px;
-      background-color: var(--bg-color);
+      padding: 0;
+      background-color: var(--bg-color); /* Gorgeous solid cyberpunk dark background */
       color: var(--text-main);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 13px;
@@ -30,20 +33,16 @@
       overflow: hidden;
     }
 
-    h2, h3, h4 {
-      margin: 0 0 8px 0;
-      font-weight: 600;
-    }
-
     h2 {
-      font-size: 16px;
+      font-size: 15px;
       color: var(--accent-gold);
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid var(--border-color);
-      padding-bottom: 8px;
-      margin-bottom: 12px;
+      padding: 10px 12px;
+      margin: 0;
+      background-color: #090d16;
     }
 
     button {
@@ -82,7 +81,7 @@
     }
 
     .input-text {
-      background-color: #020617;
+      background-color: #090d16;
       border: 1px solid var(--border-color);
       color: var(--text-main);
       padding: 8px;
@@ -97,58 +96,104 @@
 
     .panel {
       background-color: var(--panel-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 10px;
-      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px;
+      box-sizing: border-box;
     }
 
-    .scrollable-y {
+    /* Scrollable chat container */
+    #chat-container {
       flex: 1;
       overflow-y: auto;
-      margin-bottom: 12px;
-      padding-right: 4px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
-    /* Queue styles */
-    .queue-item {
+    /* Chat bubble styles */
+    .message-row {
+      display: flex;
+      width: 100%;
+    }
+    .message-row.user {
+      justify-content: flex-end;
+    }
+    .message-row.agent {
+      justify-content: flex-start;
+    }
+
+    .chat-bubble {
+      max-width: 85%;
+      padding: 8px 12px;
+      border-radius: 12px;
+      line-height: 1.4;
+      word-wrap: break-word;
+      font-size: 13px;
+    }
+    .chat-bubble.user {
+      background-color: var(--chat-user-bg);
+      color: #ffffff;
+      border-bottom-right-radius: 2px;
+    }
+    .chat-bubble.agent {
+      background-color: var(--chat-agent-bg);
+      border: 1px solid var(--border-color);
+      border-bottom-left-radius: 2px;
+    }
+
+    /* Action log and block styles */
+    .action-block {
+      background-color: #090d16;
+      border-left: 3px solid var(--accent-gold);
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 6px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 11px;
+    }
+    .action-header {
+      font-weight: bold;
+      color: var(--accent-gold);
+      margin-bottom: 4px;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      background-color: #020617;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      padding: 6px 10px;
-      margin-bottom: 6px;
-      font-size: 11px;
     }
-    .queue-item-text {
-      flex: 1;
-      margin-right: 8px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .btn-remove {
-      color: #ef4444;
-      background: none;
-      border: none;
-      padding: 0;
-      font-weight: bold;
+    .action-result {
+      color: var(--accent-emerald);
+      margin-top: 4px;
+      white-space: pre-wrap;
     }
 
-    /* Console styles */
-    #console {
-      background-color: #020617;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 10px;
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-      font-size: 11px;
-      color: #10b981;
-      height: 180px;
-      overflow-y: auto;
-      white-space: pre-wrap;
+    /* Input area at bottom */
+    .chat-input-area {
+      background-color: #090d16;
+      border-top: 1px solid var(--border-color);
+      padding: 10px 12px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+    .input-row textarea {
+      flex: 1;
+      height: 38px;
+      resize: none;
+    }
+
+    .control-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hidden {
+      display: none !important;
     }
 
     .setting-row {
@@ -160,137 +205,401 @@
       color: var(--text-muted);
       margin-bottom: 4px;
     }
-
-    .hidden {
-      display: none !important;
-    }
-
-    .mode-selector {
+    
+    .app-header {
       display: flex;
-      gap: 12px;
+      justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      background-color: #090d16;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color);
     }
-    .mode-selector label {
+    .model-select {
+      background-color: #1e293b;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+    }
+    .model-select:hover {
+      background-color: #334155;
+    }
+    .icon-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    .icon-btn:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+    }
+
+    /* Streamlined input card matching Claude UI */
+    .input-card {
+      background-color: #151f32;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .input-card textarea {
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 13px;
+      font-family: inherit;
+      resize: none;
+      width: 100%;
+      min-height: 48px;
+      max-height: 120px;
+      outline: none;
+      padding: 4px 0;
+      line-height: 1.4;
+    }
+    .input-card textarea::placeholder {
+      color: var(--text-muted);
+    }
+    .input-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255,255,255,0.03);
+      padding-top: 6px;
+    }
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+    }
+    .toolbar-right {
       display: flex;
       align-items: center;
       gap: 4px;
+    }
+    .toolbar-icon-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
       cursor: pointer;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 500;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    .toolbar-icon-btn:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+    }
+    .send-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background-color: var(--accent-gold);
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 15px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    .send-btn:hover {
+      background-color: var(--accent-gold-hover);
+      transform: scale(1.05);
+    }
+    .footer-note {
+      text-align: center;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Multi-Agent Sidebar layout styling */
+    .main-outer {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background-color: transparent;
+    }
+    .agents-rail {
+      width: 50px;
+      background-color: transparent; /* Transparent background */
+      border-right: none; /* No border-right divider */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 0;
+      gap: 16px;
+      box-sizing: border-box;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .app-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+      background-color: var(--bg-color); /* Solid app window starting point */
+      border-left: 2px solid var(--accent-gold); /* Gold wire running down the extension's edge */
+    }
+    .new-agent-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background-color: #1e293b;
+      border: 1px dashed var(--accent-gold);
+      color: var(--accent-gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    .new-agent-btn:hover {
+      background-color: rgba(251, 191, 36, 0.1);
+      transform: scale(1.05);
+    }
+    .agents-list-container {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      overflow-y: auto;
+      padding-top: 4px;
+    }
+
+    /* Hanging idle animation keyframe */
+    @keyframes monkeyHangingIdle {
+      0% { transform: translateY(0px) rotate(-1deg) translateX(4px); }
+      50% { transform: translateY(3px) rotate(2deg) translateX(4px); }
+      100% { transform: translateY(0px) rotate(-1deg) translateX(4px); }
+    }
+
+    .agent-item {
+      width: 44px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      background-color: transparent;
+      border: none;
+      
+      /* Shift them slightly right so they look like they are hanging off the rail */
+      transform: translateX(4px);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      animation: monkeyHangingIdle 4.2s ease-in-out infinite;
+    }
+    
+    /* Offset animation timing for variations */
+    .agent-item:nth-child(2n) {
+      animation-delay: -1.5s;
+      animation-duration: 4.8s;
+    }
+    .agent-item:nth-child(3n) {
+      animation-delay: -3.2s;
+      animation-duration: 3.9s;
+    }
+
+    .agent-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+
+    .agent-item:hover {
+      /* Stretch out hand towards the right when hovered */
+      transform: translateX(10px) scale(1.08) !important;
+      animation-play-state: paused;
+    }
+    .agent-item.active img {
+      filter: drop-shadow(0 0 6px var(--accent-gold));
+    }
+    .delete-agent-btn {
+      position: absolute;
+      top: 11px;
+      right: -8px; /* Placed at the edge of their hand stretch */
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background-color: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: bold;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: 1px solid #ffffff;
+      padding: 0;
+      line-height: 1;
+      z-index: 10;
+      box-shadow: 0 0 4px rgba(0,0,0,0.5);
+    }
+    .agent-item:hover .delete-agent-btn {
+      display: flex;
     }
   </style>
 </head>
 <body>
 
-  <h2>
-    <span>🐒 MonkeyPilot</span>
-    <button id="btn-toggle-settings" class="btn-outline" title="Open or close the settings configuration panel">⚙ Settings</button>
-  </h2>
+  <div class="main-outer">
+    <!-- Left Multi-Agent Rail -->
+    <div class="agents-rail">
+      <button id="btn-new-agent" class="new-agent-btn" title="Spawn a new Monkey Agent">🐵+</button>
+      <div id="agents-list" class="agents-list-container">
+        <!-- Rendered dynamically in sidepanel.js -->
+      </div>
+    </div>
 
-  <!-- Settings Panel -->
-  <div id="settings-panel" class="panel hidden">
-    <h3>Settings</h3>
-    <div class="setting-row">
-      <label for="setting-key">OpenRouter API Key</label>
-      <input type="password" id="setting-key" class="input-text" placeholder="sk-or-v1-..." title="Your OpenRouter or Ollama API authentication key">
+    <!-- Right Side Main Content Panel -->
+    <div class="app-content">
+      <!-- Header Panel -->
+      <div class="app-header">
+        <div class="header-left">
+          <select id="model-select-header" class="model-select" title="Active Model">
+            <option value="auto">🐵 Sonnet 4.6 (Auto)</option>
+            <option value="anthropic/claude-3.5-sonnet">🐵 Claude 3.5 Sonnet</option>
+            <option value="google/gemini-flash-1.5">🐵 Gemini 1.5 Flash</option>
+          </select>
+        </div>
+        <div class="header-right" style="display: flex; gap: 4px;">
+          <button id="btn-toggle-settings" class="icon-btn" title="Settings">⚙</button>
+        </div>
+      </div>
+
+      <!-- Settings Panel -->
+      <div id="settings-panel" class="panel hidden">
+        <h3 style="margin-top:0;">Settings</h3>
+        <div class="setting-row">
+          <label for="setting-github-token">GitHub Access Token (PAT)</label>
+          <input type="password" id="setting-github-token" class="input-text" placeholder="ghp_...">
+        </div>
+        
+        <details style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 8px;">
+          <summary style="cursor: pointer; font-size: 11px; color: var(--accent-gold); font-weight: bold; margin-bottom: 8px;">⚙ Advanced Parameters</summary>
+          
+          <div class="setting-row">
+            <label for="setting-key">OpenRouter API Key</label>
+            <input type="password" id="setting-key" class="input-text" placeholder="sk-or-v1-...">
+          </div>
+          <div class="setting-row">
+            <label for="setting-base-url">API Base URL</label>
+            <input type="text" id="setting-base-url" class="input-text" value="https://openrouter.ai/api/v1">
+          </div>
+          <div class="setting-row">
+            <label for="setting-model">Active Model</label>
+            <input type="text" id="setting-model" class="input-text" value="auto">
+          </div>
+          <div class="setting-row">
+            <label for="setting-speed">Step Delay</label>
+            <input type="range" id="setting-speed" min="100" max="3000" step="100" value="500" style="width: 100%;">
+            <span id="speed-val" style="font-size: 10px; color: var(--text-muted);">500ms</span>
+          </div>
+          <div class="setting-row">
+            <label style="display: flex; align-items: center; gap: 6px;">
+              <input type="checkbox" id="setting-domain-lock">
+              <strong>Domain Focus Lock</strong>
+            </label>
+          </div>
+          <div class="setting-row">
+            <label style="display: flex; align-items: center; gap: 6px;">
+              <input type="checkbox" id="setting-bypass-honeypot">
+              <strong>Bypass Honeypot Guard</strong>
+            </label>
+          </div>
+          <div class="setting-row">
+            <label style="display: flex; align-items: center; gap: 6px;">
+              <input type="checkbox" id="setting-go-crazy">
+              <strong>Go Crazy Mode</strong>
+            </label>
+          </div>
+          <div class="setting-row">
+            <label for="setting-rules">Custom Routing Rules (JSON)</label>
+            <textarea id="setting-rules" class="input-text" style="height: 45px; resize: vertical;" placeholder='{"code": "anthropic/claude-3.5-sonnet"}'></textarea>
+          </div>
+        </details>
+        
+        <button id="btn-save-settings" class="btn-indigo" style="width: 100%; margin-top: 10px;">Save Configuration</button>
+        <button id="btn-export-logs" class="btn-outline" style="width: 100%; margin-top: 8px;">📋 Export Chat Logs</button>
+        <button id="btn-group-tabs" class="btn-outline" style="width: 100%; margin-top: 8px;">🧩 Group Tabs by Domain</button>
+      </div>
+
+      <!-- Chat Viewport -->
+      <div id="chat-container">
+        <div class="message-row agent">
+          <div class="chat-bubble agent">
+            Hi! I'm MonkeyPilot. Tell me what you'd like to do, and I'll talk back and coordinate the browser or GitHub API to make it happen! 🐒
+          </div>
+        </div>
+      </div>
+
+      <!-- User Review Panel for Steps (if in Plan mode) -->
+      <div id="plan-approval-panel" class="panel hidden" style="background-color: #111a2e; border-top: 1px solid var(--accent-gold);">
+        <p style="font-size: 11px; color: var(--accent-gold); margin: 0 0 6px 0; font-weight: bold;">Proposed Action (Approve to execute):</p>
+        <textarea id="plan-proposal-textarea" class="input-text" style="font-family: monospace; font-size: 11px; height: 50px; resize: vertical; margin-bottom: 8px;"></textarea>
+        <div style="display: flex; gap: 6px;">
+          <button id="btn-approve" class="btn-gold" style="flex: 1;">Approve Step</button>
+          <button id="btn-reject" class="btn-outline" style="flex: 1; color: #ef4444; border-color: #ef4444;">Reject</button>
+        </div>
+      </div>
+
+      <!-- Chat Input & Controls Card -->
+      <div class="chat-input-area">
+        <div class="input-card">
+          <textarea id="prompt-input" placeholder="Reply to MonkeyPilot... (Enter to send, Ctrl+C to abort)"></textarea>
+          
+          <div class="input-toolbar">
+            <div class="toolbar-left">
+              <select id="run-mode-select" class="model-select" title="Execution Mode">
+                <option value="auto">🐒 Act without asking</option>
+                <option value="plan">🍌 Ask before acting</option>
+              </select>
+            </div>
+            <div class="toolbar-right">
+              <button id="btn-teach-workflow" class="toolbar-icon-btn" title="🎙️ Teach MonkeyPilot (Click to record workflow)" style="color: var(--accent-gold);">🎙️ Teach</button>
+              <button id="btn-selector-grab" class="toolbar-icon-btn" title="🍌 Grab Element CSS Selector" style="color: var(--accent-gold);">🍌 Grab</button>
+              <button id="btn-kill" class="toolbar-icon-btn hidden" title="🛑 Stop Agent" style="display: none !important;">🛑 Stop</button>
+              <button id="btn-start" class="send-btn" title="Send message" style="display: none;">↑</button>
+            </div>
+          </div>
+        </div>
+        <div class="footer-note">
+          Enter to send • Ctrl+C to abort
+        </div>
+      </div>
     </div>
-    <div class="setting-row">
-      <label for="setting-vault-pass">Vault Passphrase (Optional - encrypts key on save)</label>
-      <input type="password" id="setting-vault-pass" class="input-text" placeholder="Enter passphrase to encrypt API key" title="Enter a password to securely encrypt your API key in Chrome storage">
-    </div>
-    
-    <details style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 8px;" title="Advanced agent configuration parameters">
-      <summary style="cursor: pointer; font-size: 11px; color: var(--accent-gold); font-weight: bold; margin-bottom: 8px;">⚙ Advanced Parameters</summary>
-      
-      <div class="setting-row">
-        <label for="setting-base-url">API Base URL (e.g. for Ollama)</label>
-        <input type="text" id="setting-base-url" class="input-text" value="https://openrouter.ai/api/v1" placeholder="https://openrouter.ai/api/v1" title="The base API endpoint. Keep default for OpenRouter, or change to http://localhost:11434/v1 for Ollama">
-      </div>
-      <div class="setting-row">
-        <label for="setting-model">Active Model</label>
-        <input type="text" id="setting-model" class="input-text" value="auto" placeholder="auto or specific model ID" title="Enter 'auto' to auto-route prompts based on task complexity, or enter a specific model ID (e.g. google/gemini-2.5-flash)">
-        <span style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Set to <strong>auto</strong> to let the agent choose the best model.</span>
-      </div>
-      <div class="setting-row">
-        <label for="setting-speed">Execution Step Delay (ms)</label>
-        <input type="range" id="setting-speed" min="100" max="3000" step="100" value="500" style="width: 100%;" title="Sets the delay time in milliseconds between executing steps to evade bot-detection systems">
-        <span id="speed-val" style="font-size: 10px; color: var(--text-muted);">500ms</span>
-      </div>
-      <div class="setting-row">
-        <label style="display: flex; align-items: center; gap: 6px;" title="Blocks the agent from navigating outside the original website domain (prevents popups/redirect loops)">
-          <input type="checkbox" id="setting-domain-lock" class="accent-indigo">
-          <strong>Domain Focus Lock</strong> (prevent navigating away)
-        </label>
-      </div>
-      <div class="setting-row">
-        <label style="display: flex; align-items: center; gap: 6px;" title="Keeps the agent from clicking invisible honeypot inputs used by websites to trap bots. Recommended to keep checked (active).">
-          <input type="checkbox" id="setting-bypass-honeypot" class="accent-indigo">
-          <strong>Bypass Honeypot Guard</strong> (allow interacting with hidden elements)
-        </label>
-      </div>
-      <div class="setting-row">
-        <label style="display: flex; align-items: center; gap: 6px;" title="Developer Mode: Disable all human simulation, delays, jitter, and stealth protections for speed testing on your own sites.">
-          <input type="checkbox" id="setting-go-crazy" class="accent-indigo">
-          <strong>Go Crazy Mode</strong> (disable human-like safety guards)
-        </label>
-      </div>
-      <div class="setting-row">
-        <label for="setting-rules">Custom Routing Rules (JSON rules: {"keyword": "model"})</label>
-        <textarea id="setting-rules" class="input-text" style="height: 50px; resize: vertical;" placeholder='{"code": "anthropic/claude-3.5-sonnet"}' title="Define custom keyword rules to always override auto-routing to specific models (e.g. use Claude 3.5 Sonnet if prompt mentions coding)"></textarea>
-      </div>
-    </details>
-    
-    <button id="btn-save-settings" class="btn-indigo" style="width: 100%; margin-top: 10px;" title="Save your API keys and configuration parameters to local storage">Save Configuration</button>
   </div>
-
-  <div class="scrollable-y">
-    <!-- Queue Control Panel -->
-    <div class="panel">
-      <h3>Prompt Queue</h3>
-      <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px;">
-        <textarea id="prompt-input" class="input-text" style="height: 60px; resize: vertical;" placeholder="Enter browser instruction..." title="Type your objective here (e.g. 'Log into Gmail and search for inbox receipts')"></textarea>
-        <div style="display: flex; gap: 6px; justify-content: flex-end;">
-          <button id="btn-selector-grab" class="btn-outline" title="Click here, then click any element on the webpage to automatically extract and paste its CSS selector path into your prompt" style="flex: 1;">🎯 Grab Selector</button>
-          <button id="btn-add-queue" class="btn-indigo" title="Add your prompt instruction to the execution queue" style="flex: 1;">Queue Prompt</button>
-        </div>
-      </div>
-      <div id="queue-list">
-        <div class="text-slate-500 text-xs italic">No prompts queued.</div>
-      </div>
-    </div>
-
-    <!-- Execution Mode -->
-    <div class="panel">
-      <h3>Execution Control</h3>
-      <div class="mode-selector">
-        <span>Mode:</span>
-        <label title="Shows proposed JSON steps and waits for your manual approval before executing"><input type="radio" name="run-mode" value="plan" checked class="accent-indigo"> Plan (Approve steps)</label>
-        <label title="Runs the queue completely autonomously step-by-step"><input type="radio" name="run-mode" value="auto" class="accent-indigo"> Auto (Autonomous)</label>
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <div style="display: flex; gap: 6px;">
-          <button id="btn-start" class="btn-gold" style="flex: 1;" title="Start executing the prompt queue sequentially">Start Agent</button>
-          <button id="btn-kill" class="btn-outline" style="flex: 1; color: #ef4444; border-color: #ef4444;" title="Instantly terminate the active agent execution loop and empty the prompt queue">Kill Agent</button>
-        </div>
-        <div style="display: flex; gap: 6px;">
-          <button id="btn-export-logs" class="btn-outline" style="flex: 1;" title="Download a formatted Markdown file containing execution history, logs, and screenshots">Export Logs</button>
-          <button id="btn-clear-console" class="btn-outline" style="flex: 1;" title="Clear the live log output console window">Clear Log</button>
-        </div>
-      </div>
-      <!-- User Review Action Panel (For Plan Mode) -->
-      <div id="plan-approval-panel" class="hidden" style="margin-top: 10px; border-t: 1px solid var(--border-color); pt: 8px;">
-        <p style="font-size: 11px; color: var(--accent-gold); margin: 0 0 6px 0;">Proposed action (JSON - Editable):</p>
-        <textarea id="plan-proposal-textarea" class="input-text" style="font-family: monospace; font-size: 11px; height: 60px; resize: vertical; margin-bottom: 8px;" title="The JSON plan proposed by the LLM. You can edit this JSON directly before approving."></textarea>
-        <div style="display: flex; gap: 6px;">
-          <button id="btn-approve" class="btn-indigo" style="flex: 1; padding: 4px 8px;" title="Approve the proposed action above and proceed to execution">Approve Step</button>
-          <button id="btn-reject" class="btn-outline" style="flex: 1; padding: 4px 8px; color: #ef4444; border-color: #ef4444;" title="Reject this step and pause agent execution">Reject</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Agent Output Console -->
-  <h4>Live Execution Log</h4>
-  <div id="console">Ready. Queue a prompt and click Start.</div>
 
   <script src="agent.js"></script>
   <script src="sidepanel.js"></script>

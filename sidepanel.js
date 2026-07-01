@@ -1,4 +1,4 @@
-// sidepanel.js - UI, Queue, and Vault Controller
+// sidepanel.js - Conversational Chat UI & Controller
 
 document.addEventListener("DOMContentLoaded", async () => {
   const DEFAULT_KEY = "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";
@@ -6,8 +6,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 
   // Elements
-  const elVaultPass = document.getElementById("setting-vault-pass");
   const elKey = document.getElementById("setting-key");
+  const elGithubToken = document.getElementById("setting-github-token");
   const elBaseUrl = document.getElementById("setting-base-url");
   const elModel = document.getElementById("setting-model");
   const elSpeed = document.getElementById("setting-speed");
@@ -23,37 +23,54 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const promptInput = document.getElementById("prompt-input");
   const btnSelectorGrab = document.getElementById("btn-selector-grab");
-  const btnAddQueue = document.getElementById("btn-add-queue");
-  const queueList = document.getElementById("queue-list");
-
-  const runModePlan = document.querySelector('input[value="plan"]');
   const btnStart = document.getElementById("btn-start");
   const btnKill = document.getElementById("btn-kill");
   const btnExportLogs = document.getElementById("btn-export-logs");
-  const btnClearConsole = document.getElementById("btn-clear-console");
+  const modelSelectHeader = document.getElementById("model-select-header");
+  const runModeSelect = document.getElementById("run-mode-select");
+  const btnTeachWorkflow = document.getElementById("btn-teach-workflow");
+  const btnNewAgent = document.getElementById("btn-new-agent");
+  const agentsListContainer = document.getElementById("agents-list");
   
   const planPanel = document.getElementById("plan-approval-panel");
   const planTextarea = document.getElementById("plan-proposal-textarea");
   const btnApprove = document.getElementById("btn-approve");
   const btnReject = document.getElementById("btn-reject");
-  const logConsole = document.getElementById("console");
+  const chatContainer = document.getElementById("chat-container");
+  const btnGroupTabs = document.getElementById("btn-group-tabs");
 
   // State
-  let queue = [];
   let isRunning = false;
   let activeAgent = null;
   let logsMarkdown = "# Execution Logs\n";
+  let currentActionBlock = null;
+
+  let agentsList = [];
+  let activeAgentIndex = 0;
+
+  // Get active tab and group it under "🐒 MonkeyPilot"
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (activeTab && activeTab.url && !activeTab.url.startsWith("chrome")) {
+      if (!activeTab.groupId || activeTab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) {
+        chrome.tabs.group({ tabIds: [activeTab.id] }, (groupId) => {
+          chrome.tabGroups.update(groupId, { title: "🐒 MonkeyPilot", color: "orange" });
+          chrome.storage.local.set({ monkeyPilotGroupId: groupId });
+        });
+      } else {
+        chrome.storage.local.set({ monkeyPilotGroupId: activeTab.groupId });
+      }
+    }
+  } catch(e) {}
 
   // Initialize UI Values from Storage
   chrome.storage.local.get([
-    "apiKey", "encryptedKey", "model", "baseUrl", "speed", "domainLock", "bypassHoneypot", "goCrazy", "routingRules", "queue"
+    "apiKey", "model", "baseUrl", "speed", "domainLock", "bypassHoneypot", "goCrazy", "routingRules", "githubToken", "agentsList", "activeAgentIndex"
   ], (data) => {
-    elKey.value = data.apiKey || (data.encryptedKey ? "" : DEFAULT_KEY);
-    if (data.encryptedKey) {
-      elVaultPass.placeholder = "Enter passphrase to UNLOCK encrypted key";
-      elKey.placeholder = "Locked (encrypted)";
-    }
+    elKey.value = data.apiKey || DEFAULT_KEY;
+    elGithubToken.value = data.githubToken || "";
     elModel.value = data.model || DEFAULT_MODEL;
+    modelSelectHeader.value = data.model || DEFAULT_MODEL;
     elBaseUrl.value = data.baseUrl || DEFAULT_BASE_URL;
     elSpeed.value = data.speed || "500";
     speedVal.textContent = `${elSpeed.value}ms`;
@@ -62,10 +79,73 @@ document.addEventListener("DOMContentLoaded", async () => {
     elGoCrazy.checked = !!data.goCrazy;
     elRules.value = data.routingRules ? JSON.stringify(data.routingRules) : "";
     
-    if (data.queue) {
-      queue = data.queue;
-      renderQueue();
+    // Load sessions
+    if (data.agentsList && data.agentsList.length > 0) {
+      agentsList = data.agentsList;
+      activeAgentIndex = data.activeAgentIndex || 0;
+      if (activeAgentIndex >= agentsList.length) activeAgentIndex = 0;
+    } else {
+      // Create initial monkey agent session
+      agentsList = [{
+        id: Date.now(),
+        emoji: "🐒",
+        history: [],
+        currentPrompt: "",
+        targetTabId: null,
+        logsMarkdown: "# Execution Logs\n"
+      }];
+      activeAgentIndex = 0;
     }
+    
+    renderAgentsList();
+    restoreActiveAgentSession();
+  });
+
+  // Sync header model change
+  modelSelectHeader.addEventListener("change", (e) => {
+    const selectedModel = e.target.value;
+    chrome.storage.local.set({ model: selectedModel });
+    elModel.value = selectedModel;
+  });
+
+  // Teach Workflow Click Handler
+  btnTeachWorkflow.addEventListener("click", async () => {
+    const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (!activeTab) return;
+    
+    appendSystemBubble("🎙️ Teach Mode Active: Click any element in your tab to record it as an instruction step...");
+    
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: activeTab.id },
+        func: () => {
+          const onTeachClick = (e) => {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            
+            let desc = e.target.textContent.trim().slice(0, 30) || e.target.placeholder || e.target.value || "element";
+            let tag = e.target.tagName.toLowerCase();
+            let id = e.target.id ? `#${e.target.id}` : "";
+            let selector = tag + id;
+            
+            chrome.runtime.sendMessage({
+              type: "TEACH_STEP",
+              selector,
+              desc
+            });
+            
+            const origOutline = e.target.style.outline;
+            e.target.style.outline = "2px dashed #fbbf24";
+            setTimeout(() => {
+              e.target.style.outline = origOutline;
+            }, 800);
+            
+            document.removeEventListener("click", onTeachClick, true);
+          };
+          document.addEventListener("click", onTeachClick, true);
+        }
+      });
+    } catch(e) {}
   });
 
   // Slider change display
@@ -78,65 +158,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     settingsPanel.classList.toggle("hidden");
   });
 
-  // Crypto Helpers
-  async function deriveKey(passphrase, salt) {
-    const enc = new TextEncoder();
-    const keyMaterial = await window.crypto.subtle.importKey(
-      "raw", enc.encode(passphrase), { name: "PBKDF2" }, false, ["deriveKey"]
-    );
-    return window.crypto.subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        salt: salt,
-        iterations: 100000,
-        hash: "SHA-256"
-      },
-      keyMaterial,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"]
-    );
-  }
-
-  async function encryptData(plainText, passphrase) {
-    const enc = new TextEncoder();
-    const salt = window.crypto.getRandomValues(new Uint8Array(16));
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    const key = await deriveKey(passphrase, salt);
-    
-    const ciphertext = await window.crypto.subtle.encrypt(
-      { name: "AES-GCM", iv: iv },
-      key,
-      enc.encode(plainText)
-    );
-
-    return {
-      salt: btoa(String.fromCharCode(...salt)),
-      iv: btoa(String.fromCharCode(...iv)),
-      ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertext)))
-    };
-  }
-
-  async function decryptData(encryptedObj, passphrase) {
-    const salt = new Uint8Array(atob(encryptedObj.salt).split("").map(c => c.charCodeAt(0)));
-    const iv = new Uint8Array(atob(encryptedObj.iv).split("").map(c => c.charCodeAt(0)));
-    const ciphertext = new Uint8Array(atob(encryptedObj.ciphertext).split("").map(c => c.charCodeAt(0)));
-    
-    const key = await deriveKey(passphrase, salt);
-    const dec = new TextDecoder();
-    
-    const decrypted = await window.crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: iv },
-      key,
-      ciphertext
-    );
-    return dec.decode(decrypted);
-  }
-
   // Save Settings
   btnSaveSettings.addEventListener("click", async () => {
     const rawKey = elKey.value.trim();
-    const passphrase = elVaultPass.value.trim();
+    const githubToken = elGithubToken.value.trim();
     const model = elModel.value.trim();
     const baseUrl = elBaseUrl.value.trim();
     const speed = elSpeed.value;
@@ -150,39 +175,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         rules = JSON.parse(elRules.value);
       }
     } catch(e) {
-      writeLog("Error: Invalid JSON syntax in Custom Routing Rules.");
+      appendSystemBubble("Error: Invalid JSON syntax in Custom Routing Rules.");
       return;
     }
 
-    const payload = { model, baseUrl, speed, domainLock, bypassHoneypot, goCrazy, routingRules: rules };
-
-    if (passphrase) {
-      // Key encryption
-      if (!rawKey) {
-        writeLog("Error: Enter API key to encrypt.");
-        return;
-      }
-      try {
-        const encrypted = await encryptData(rawKey, passphrase);
-        payload.encryptedKey = encrypted;
-        payload.apiKey = ""; // Clear plaintext
-        elKey.placeholder = "Locked (encrypted)";
-        elKey.value = "";
-        elVaultPass.value = "";
-      } catch (err) {
-        writeLog(`Encryption failed: ${err.message}`);
-        return;
-      }
-    } else {
-      // Direct store
-      if (rawKey) {
-        payload.apiKey = rawKey;
-        payload.encryptedKey = null;
-      }
-    }
+    const payload = { apiKey: rawKey, model, baseUrl, speed, domainLock, bypassHoneypot, goCrazy, routingRules: rules, githubToken };
 
     chrome.storage.local.set(payload, () => {
-      writeLog("Configuration successfully saved.");
+      appendSystemBubble("Configuration successfully saved.");
       settingsPanel.classList.add("hidden");
     });
   });
@@ -192,118 +192,451 @@ document.addEventListener("DOMContentLoaded", async () => {
     const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (!activeTab) return;
     
-    writeLog("Grab tool active. Hover and click an element in the tab...");
+    appendSystemBubble("Selector grab tool active. Hover and click an element in the active tab...");
 
-    await chrome.scripting.executeScript({
-      target: { tabId: activeTab.id },
-      func: () => {
-        // Overlay and click interceptor
-        const overlay = document.createElement("div");
-        overlay.style.position = "fixed";
-        overlay.style.pointerEvents = "none";
-        overlay.style.border = "2px dashed #fbbf24";
-        overlay.style.backgroundColor = "rgba(251, 191, 36, 0.1)";
-        overlay.style.zIndex = "999999";
-        document.body.appendChild(overlay);
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: activeTab.id },
+        func: () => {
+          // Pre-existing elements cleanup
+          const existingOverlay = document.getElementById("monkeypilot-grab-overlay");
+          if (existingOverlay) existingOverlay.remove();
+          const existingTooltip = document.getElementById("monkeypilot-grab-tooltip");
+          if (existingTooltip) existingTooltip.remove();
 
-        let activeEl = null;
+          // Highlight overlay element
+          const overlay = document.createElement("div");
+          overlay.id = "monkeypilot-grab-overlay";
+          overlay.style.position = "fixed";
+          overlay.style.pointerEvents = "none";
+          overlay.style.border = "2px solid #fbbf24";
+          overlay.style.backgroundColor = "rgba(251, 191, 36, 0.15)";
+          overlay.style.boxShadow = "0 0 8px rgba(251, 191, 36, 0.5)";
+          overlay.style.zIndex = "999999";
+          overlay.style.transition = "all 0.1s ease";
+          document.body.appendChild(overlay);
 
-        const onHover = (e) => {
-          activeEl = e.target;
-          const rect = activeEl.getBoundingClientRect();
-          overlay.style.left = rect.left + "px";
-          overlay.style.top = rect.top + "px";
-          overlay.style.width = rect.width + "px";
-          overlay.style.height = rect.height + "px";
-        };
+          // Info tooltip element
+          const tooltip = document.createElement("div");
+          tooltip.id = "monkeypilot-grab-tooltip";
+          tooltip.style.position = "fixed";
+          tooltip.style.pointerEvents = "none";
+          tooltip.style.backgroundColor = "#0f172a";
+          tooltip.style.color = "#fbbf24";
+          tooltip.style.padding = "4px 8px";
+          tooltip.style.borderRadius = "4px";
+          tooltip.style.fontSize = "11px";
+          tooltip.style.fontFamily = "monospace";
+          tooltip.style.zIndex = "999999";
+          tooltip.style.boxShadow = "0 2px 6px rgba(0,0,0,0.4)";
+          tooltip.style.border = "1px solid #334155";
+          document.body.appendChild(tooltip);
 
-        const generateSelector = (el) => {
-          if (el.id) return `#${el.id}`;
-          let path = [];
-          while (el && el.nodeType === Node.ELEMENT_NODE) {
-            let selector = el.nodeName.toLowerCase();
-            if (el.className) {
-              const classes = Array.from(el.classList).join(".");
-              if (classes) selector += `.${classes}`;
+          let activeEl = null;
+
+          const onHover = (e) => {
+            activeEl = e.target;
+            if (activeEl.id === "monkeypilot-grab-overlay" || activeEl.id === "monkeypilot-grab-tooltip") return;
+            
+            const rect = activeEl.getBoundingClientRect();
+            overlay.style.left = rect.left + "px";
+            overlay.style.top = rect.top + "px";
+            overlay.style.width = rect.width + "px";
+            overlay.style.height = rect.height + "px";
+
+            // Render tooltip text
+            let tagStr = activeEl.tagName.toLowerCase();
+            if (activeEl.id) tagStr += `#${activeEl.id}`;
+            else if (activeEl.className && typeof activeEl.className === "string") {
+              const classes = activeEl.className.trim().split(/\s+/).filter(Boolean).slice(0, 2).join(".");
+              if (classes) tagStr += `.${classes}`;
             }
-            path.unshift(selector);
-            el = el.parentNode;
-          }
-          return path.join(" > ");
-        };
+            tooltip.textContent = tagStr;
+            
+            const tooltipX = rect.left;
+            const tooltipY = rect.top - 24 > 5 ? rect.top - 24 : rect.bottom + 5;
+            tooltip.style.left = tooltipX + "px";
+            tooltip.style.top = tooltipY + "px";
+          };
 
-        const onClick = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const selector = generateSelector(activeEl);
-          
-          // Cleanup
-          overlay.remove();
-          document.removeEventListener("mouseover", onHover);
-          document.removeEventListener("click", onClick, true);
-          
-          // Send back
-          chrome.runtime.sendMessage({ type: "GRABBED_SELECTOR", selector });
-        };
+          const generateSelector = (el) => {
+            if (el.id) return `#${el.id}`;
+            if (el.tagName === "BODY") return "body";
+            if (el.tagName === "HTML") return "html";
+            
+            // Try unique attributes
+            const uniqueAttrs = ["name", "placeholder", "aria-label", "data-testid", "role"];
+            for (const attr of uniqueAttrs) {
+              const val = el.getAttribute(attr);
+              if (val) {
+                const sel = `${el.tagName.toLowerCase()}[${attr}="${val}"]`;
+                try {
+                  if (document.querySelectorAll(sel).length === 1) return sel;
+                } catch(err) {}
+              }
+            }
 
-        document.addEventListener("mouseover", onHover);
-        document.addEventListener("click", onClick, true);
-      }
-    });
+            // Fallback path
+            let path = [];
+            let current = el;
+            while (current && current.nodeType === Node.ELEMENT_NODE) {
+              let selector = current.nodeName.toLowerCase();
+              if (current.id) {
+                selector += `#${current.id}`;
+                path.unshift(selector);
+                break;
+              } else {
+                let cleanClasses = [];
+                if (current.classList && current.classList.length > 0) {
+                  current.classList.forEach(cls => {
+                    if (cls && !cls.includes(":") && !cls.includes("[") && !cls.includes("]")) {
+                      cleanClasses.push(cls);
+                    }
+                  });
+                }
+                if (cleanClasses.length > 0) {
+                  selector += "." + cleanClasses.join(".");
+                }
+                
+                let sibling = current.previousElementSibling;
+                let nth = 1;
+                while (sibling) {
+                  if (sibling.nodeName === current.nodeName) {
+                    nth++;
+                  }
+                  sibling = sibling.previousElementSibling;
+                }
+                if (nth > 1 || (current.nextElementSibling && [...current.parentNode.children].filter(c => c.nodeName === current.nodeName).length > 1)) {
+                  selector += `:nth-of-type(${nth})`;
+                }
+              }
+              path.unshift(selector);
+              current = current.parentNode;
+            }
+            return path.join(" > ");
+          };
+
+          const onClick = (e) => {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const selector = generateSelector(activeEl);
+            
+            overlay.style.backgroundColor = "rgba(16, 185, 129, 0.4)";
+            overlay.style.border = "2px solid #10b981";
+            overlay.style.boxShadow = "0 0 12px rgba(16, 185, 129, 0.7)";
+            tooltip.style.color = "#10b981";
+            tooltip.style.borderColor = "#10b981";
+            tooltip.textContent = "Selected!";
+
+            setTimeout(() => {
+              overlay.remove();
+              tooltip.remove();
+            }, 300);
+
+            document.removeEventListener("mouseover", onHover, true);
+            document.removeEventListener("click", onClick, true);
+            document.removeEventListener("mousedown", onMouseDown, true);
+            document.removeEventListener("mouseup", onMouseUp, true);
+            
+            try {
+              chrome.runtime.sendMessage({ type: "GRABBED_SELECTOR", selector });
+            } catch (err) {}
+          };
+
+          const onMouseDown = (e) => {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          };
+
+          const onMouseUp = (e) => {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          };
+
+          document.addEventListener("mouseover", onHover, true);
+          document.addEventListener("click", onClick, true);
+          document.addEventListener("mousedown", onMouseDown, true);
+          document.addEventListener("mouseup", onMouseUp, true);
+        }
+      });
+    } catch(err) {
+      appendSystemBubble(`Grab tool error: ${err.message}. Make sure you are on a normal website tab (not chrome:// or a local file)`);
+    }
   });
 
-  // Listen for grabbed selector message
+  // Listen for grabbed selector and teaching messages
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === "GRABBED_SELECTOR") {
       promptInput.value += ` "${message.selector}"`;
-      writeLog(`Grabbed element: ${message.selector}`);
+      appendSystemBubble(`Grabbed element selector: ${message.selector}`);
+    } else if (message.type === "TEACH_STEP") {
+      promptInput.value += ` click on "${message.desc}" (${message.selector})`;
+      appendSystemBubble(`Recorded teaching step: Clicked on "${message.desc}"`);
+    } else if (message.type === "STOP_AGENT") {
+      btnKill.click();
     }
   });
 
-  // Add to Queue
-  btnAddQueue.addEventListener("click", async () => {
-    const text = promptInput.value.trim();
-    if (!text) return;
-    const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    queue.push({
-      text: text,
-      tabId: activeTab ? activeTab.id : null,
-      tabTitle: activeTab ? activeTab.title.slice(0, 15) : "Tab"
-    });
-    promptInput.value = "";
-    chrome.storage.local.set({ queue });
-    renderQueue();
-  });
+  // UI Bubble Helpers
+  function appendUserBubble(text) {
+    const row = document.createElement("div");
+    row.className = "message-row user";
+    row.innerHTML = `<div class="chat-bubble user">${escapeHtml(text)}</div>`;
+    chatContainer.appendChild(row);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    logsMarkdown += `\n\n**User:** ${text}`;
+  }
 
-  function renderQueue() {
-    queueList.innerHTML = "";
-    if (queue.length === 0) {
-      queueList.innerHTML = '<div class="text-slate-500 text-xs italic">No prompts queued.</div>';
-      return;
-    }
-    queue.forEach((item, index) => {
-      const div = document.createElement("div");
-      div.className = "queue-item";
-      const textVal = typeof item === "string" ? item : item.text;
-      const tabLabel = (item && item.tabTitle) ? `[${item.tabTitle}] ` : "";
-      div.innerHTML = `
-        <span class="queue-item-text">${index + 1}. <strong style="color: var(--accent-gold);">${escapeHtml(tabLabel)}</strong>${escapeHtml(textVal)}</span>
-        <button class="btn-remove" data-index="${index}">✕</button>
-      `;
-      queueList.appendChild(div);
-    });
+  function appendAgentBubble(text) {
+    const row = document.createElement("div");
+    row.className = "message-row agent";
+    row.innerHTML = `<div class="chat-bubble agent">${escapeHtml(text)}</div>`;
+    chatContainer.appendChild(row);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    logsMarkdown += `\n\n**MonkeyPilot:** ${text}`;
+  }
 
-    document.querySelectorAll(".btn-remove").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const idx = parseInt(e.target.getAttribute("data-index"));
-        queue.splice(idx, 1);
-        chrome.storage.local.set({ queue });
-        renderQueue();
-      });
+  function appendSystemBubble(text) {
+    const row = document.createElement("div");
+    row.className = "message-row agent";
+    row.innerHTML = `<div class="chat-bubble agent" style="border-color: var(--accent-gold); color: var(--accent-gold); font-size:11px;">⚠️ ${escapeHtml(text)}</div>`;
+    chatContainer.appendChild(row);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    logsMarkdown += `\n\n**System:** ${text}`;
+  }
+
+  function appendActionBlock(actionText, detail) {
+    const block = document.createElement("div");
+    block.className = "action-block";
+    block.innerHTML = `
+      <div class="action-header">
+        <span>⚙️ ${escapeHtml(actionText.toUpperCase())}</span>
+      </div>
+      <div class="action-detail" style="color: var(--text-muted); margin-bottom: 4px;">${escapeHtml(detail)}</div>
+      <div class="action-result" style="color: var(--accent-gold);">Executing...</div>
+    `;
+    chatContainer.appendChild(block);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    logsMarkdown += `\n\n*Action:* ${actionText} - ${detail}`;
+    return block;
+  }
+
+  function restoreConversation(history) {
+    // Clear initial greeting and render saved history
+    chatContainer.innerHTML = "";
+    history.forEach(item => {
+      if (item.role === "user") {
+        appendUserBubble(item.content);
+      } else if (item.role === "assistant") {
+        try {
+          const plan = JSON.parse(item.content);
+          if (plan.message) {
+            appendAgentBubble(plan.message);
+          }
+          if (plan.action && plan.action !== "chat_response") {
+            let details = plan.url || plan.selector || "";
+            if (plan.action === "github_api" && plan.github_api_opts) {
+              details = `${plan.github_api_opts.method} ${plan.github_api_opts.path}`;
+            }
+            const block = appendActionBlock(plan.action, details);
+            const resEl = block.querySelector(".action-result");
+            if (resEl) {
+              resEl.textContent = "Completed";
+              resEl.style.color = "var(--accent-emerald)";
+            }
+          }
+        } catch(e) {
+          appendAgentBubble(item.content);
+        }
+      }
     });
   }
 
-    async function syncLogToServer(data) {
+  const transparentCache = {};
+
+  function getTransparentImage(imgUrl) {
+    if (transparentCache[imgUrl]) {
+      return Promise.resolve(transparentCache[imgUrl]);
+    }
+    
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = imgUrl;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+        
+        // Loop through pixels and convert solid black/near-black pixels to transparent
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i+1];
+          const b = data[i+2];
+          
+          // Threshold check: R, G, B below 40 are treated as background
+          if (r < 40 && g < 40 && b < 40) {
+            data[i+3] = 0;
+          }
+        }
+        
+        ctx.putImageData(imgData, 0, 0);
+        const dataUrl = canvas.toDataURL("image/png");
+        transparentCache[imgUrl] = dataUrl;
+        resolve(dataUrl);
+      };
+      img.onerror = () => {
+        resolve(imgUrl); // Fallback to raw path
+      };
+    });
+  }
+
+  function renderAgentsList() {
+    agentsListContainer.innerHTML = "";
+    agentsList.forEach((agent, index) => {
+      const el = document.createElement("div");
+      el.className = `agent-item ${index === activeAgentIndex ? 'active' : ''}`;
+      el.title = `Switch to Monkey Agent ${index + 1}`;
+      el.innerHTML = `
+        <img class="monkey-sprite" src="" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: none;">
+        <button class="delete-agent-btn" title="Delete Agent">×</button>
+      `;
+      
+      const imgPath = agent.image || 'assets/monkey_cyan.png';
+      getTransparentImage(imgPath).then(transparentUrl => {
+        const sprite = el.querySelector(".monkey-sprite");
+        if (sprite) {
+          sprite.src = transparentUrl;
+          sprite.style.display = "block";
+        }
+      });
+      
+      el.addEventListener("click", (e) => {
+        if (e.target.classList.contains("delete-agent-btn")) {
+          e.stopPropagation();
+          deleteAgentSession(index);
+          return;
+        }
+        switchActiveAgentSession(index);
+      });
+      agentsListContainer.appendChild(el);
+    });
+  }
+
+  function switchActiveAgentSession(index) {
+    if (index === activeAgentIndex) return;
+    
+    // Save current session properties
+    if (activeAgent) {
+      agentsList[activeAgentIndex].history = activeAgent.history;
+      agentsList[activeAgentIndex].targetTabId = activeAgent.targetTabId;
+    }
+    agentsList[activeAgentIndex].logsMarkdown = logsMarkdown;
+    
+    activeAgentIndex = index;
+    activeAgent = null; // Instantiated fresh on next send
+    
+    saveSessionsToStorage();
+    renderAgentsList();
+    restoreActiveAgentSession();
+  }
+
+  function deleteAgentSession(index) {
+    const deleted = agentsList.splice(index, 1)[0];
+    
+    // Clean up webpage stop overlay if it's the active one
+    if (index === activeAgentIndex && activeAgent) {
+      try {
+        activeAgent.removeStopOverlay();
+      } catch(e) {}
+      activeAgent = null;
+    }
+    
+    if (agentsList.length === 0) {
+      agentsList = [{
+        id: Date.now(),
+        emoji: "🐒",
+        image: "assets/monkey_cyan.png",
+        history: [],
+        currentPrompt: "",
+        targetTabId: null,
+        logsMarkdown: "# Execution Logs\n"
+      }];
+      activeAgentIndex = 0;
+    } else {
+      if (activeAgentIndex >= agentsList.length) {
+        activeAgentIndex = agentsList.length - 1;
+      }
+    }
+    
+    saveSessionsToStorage();
+    renderAgentsList();
+    restoreActiveAgentSession();
+  }
+
+  function restoreActiveAgentSession() {
+    const session = agentsList[activeAgentIndex];
+    logsMarkdown = session.logsMarkdown || "# Execution Logs\n";
+    isRunning = false;
+    btnKill.classList.add("hidden");
+    btnStart.innerHTML = "↑";
+    planPanel.classList.add("hidden");
+    
+    // Set target tab to settings if stored
+    chrome.storage.local.set({ targetTabId: session.targetTabId });
+    
+    restoreConversation(session.history || []);
+  }
+
+  function saveSessionsToStorage() {
+    const serializable = agentsList.map(a => ({
+      id: a.id,
+      emoji: a.emoji,
+      image: a.image,
+      history: a.history,
+      currentPrompt: a.currentPrompt,
+      targetTabId: a.targetTabId,
+      logsMarkdown: a.logsMarkdown
+    }));
+    chrome.storage.local.set({
+      agentsList: serializable,
+      activeAgentIndex: activeAgentIndex
+    });
+  }
+
+  // Spawn New Monkey Agent Button Listener
+  const monkeyAssets = ["assets/monkey_cyan.png", "assets/monkey_magenta.png", "assets/monkey_gold.png"];
+  btnNewAgent.addEventListener("click", () => {
+    if (activeAgent) {
+      agentsList[activeAgentIndex].history = activeAgent.history;
+      agentsList[activeAgentIndex].targetTabId = activeAgent.targetTabId;
+    }
+    agentsList[activeAgentIndex].logsMarkdown = logsMarkdown;
+
+    const newImage = monkeyAssets[agentsList.length % monkeyAssets.length];
+    const newSession = {
+      id: Date.now(),
+      emoji: "🐒",
+      image: newImage,
+      history: [],
+      currentPrompt: "",
+      targetTabId: null,
+      logsMarkdown: "# Execution Logs\n"
+    };
+    agentsList.push(newSession);
+    activeAgentIndex = agentsList.length - 1;
+    activeAgent = null;
+
+    saveSessionsToStorage();
+    renderAgentsList();
+    restoreActiveAgentSession();
+  });
+
+  async function syncLogToServer(data) {
     try {
       await fetch("http://localhost:5000/", {
         method: "POST",
@@ -314,105 +647,86 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function writeLog(text) {
-    logConsole.textContent += "\n" + text;
-    logConsole.scrollTop = logConsole.scrollHeight;
+    console.log(text);
     logsMarkdown += `\n${text}`;
-  }
-
-  function clearLog() {
-    logConsole.textContent = "Logs cleared.";
-    logsMarkdown = "# Execution Logs\n";
-  }
-
-  btnClearConsole.addEventListener("click", clearLog);
-
-  // Start Loop
-  btnStart.addEventListener("click", async () => {
-    if (isRunning) {
-      isRunning = false;
-      btnStart.textContent = "Start Agent";
-      writeLog("Agent execution paused.");
-      return;
+    
+    if (text.startsWith("Proposed action: ")) {
+      try {
+        const jsonStr = text.substring("Proposed action: ".length);
+        const plan = JSON.parse(jsonStr);
+        if (plan.action && plan.action !== "chat_response") {
+          let details = "";
+          if (plan.action === "navigate" || plan.action === "open_tab") details = plan.url;
+          else if (plan.action === "click_element" || plan.action === "type_text") details = `${plan.selector} ${plan.text ? `("${plan.text}")` : ""}`;
+          else if (plan.action === "github_api" && plan.github_api_opts) details = `${plan.github_api_opts.method} ${plan.github_api_opts.path}`;
+          else if (plan.action === "group_tabs") details = plan.title;
+          else details = JSON.stringify(plan);
+          
+          currentActionBlock = appendActionBlock(plan.action, details);
+        }
+      } catch(e) {}
+    } else if (text.startsWith("Result: ") || text.startsWith("Execution Blocked: ")) {
+      if (currentActionBlock) {
+        const resEl = currentActionBlock.querySelector(".action-result");
+        if (resEl) {
+          resEl.textContent = text;
+          if (text.includes("Error") || text.includes("Blocked") || text.includes("not found")) {
+            resEl.style.color = "#ef4444";
+          } else {
+            resEl.style.color = "var(--accent-emerald)";
+          }
+        }
+        currentActionBlock = null;
+      }
     }
+  }
 
-    if (queue.length === 0) {
-      writeLog("Error: No prompts in the queue.");
+  let promptQueue = [];
+
+  // Submit / Send action
+  btnStart.addEventListener("click", async () => {
+    const promptText = promptInput.value.trim();
+    if (!promptText) return;
+
+    appendUserBubble(promptText);
+    promptInput.value = "";
+
+    if (isRunning) {
+      promptQueue.push(promptText);
+      appendSystemBubble(`Prompt queued: "${promptText}"`);
       return;
     }
 
     isRunning = true;
-    btnStart.textContent = "Pause Agent";
-    btnStart.classList.add("btn-indigo");
-    btnStart.classList.remove("btn-gold");
-
-    runQueueLoop();
+    btnKill.classList.remove("hidden");
+    btnStart.innerHTML = "⏳";
+    runAgentTurn(promptText);
   });
 
-  async function runQueueLoop() {
-    while (queue.length > 0 && isRunning) {
-      const promptObj = queue[0];
-      const promptText = typeof promptObj === "string" ? promptObj : promptObj.text;
-      
-      if (promptObj && promptObj.tabId) {
-        try {
-          await new Promise((resolve, reject) => {
-            chrome.tabs.update(promptObj.tabId, { active: true }, (tab) => {
-              if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-              } else {
-                if (tab && tab.windowId) {
-                  chrome.windows.update(tab.windowId, { focused: true }, () => {
-                    resolve(tab);
-                  });
-                } else {
-                  resolve(tab);
-                }
-              }
-            });
-          });
-          await new Promise(r => setTimeout(r, 400)); // Wait for tab focus
-        } catch(e) {
-          writeLog("Target tab was closed or focus failed. Running on current active tab.");
-        }
-      }
-      
-      const config = await new Promise((resolve) => {
-        chrome.storage.local.get([
-          "apiKey", "encryptedKey", "model", "baseUrl", "speed", "domainLock", "bypassHoneypot", "goCrazy", "routingRules"
-        ], resolve);
-      });
+  // Handle Enter key inside textarea and Ctrl+C shortcut to abort
+  promptInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      btnStart.click();
+    } else if (e.key === "c" && e.ctrlKey) {
+      e.preventDefault();
+      resetAgentSession();
+    }
+  });
 
-      let apiKey = config.apiKey;
-      if (config.encryptedKey && !apiKey) {
-        // Vault unlock
-        const pass = elVaultPass.value.trim();
-        if (!pass) {
-          writeLog("Error: API Key is encrypted. Enter Vault Passphrase in settings to unlock.");
-          isRunning = false;
-          btnStart.textContent = "Start Agent";
-          return;
-        }
-        try {
-          apiKey = await decryptData(config.encryptedKey, pass);
-        } catch (err) {
-          writeLog("Error: Incorrect Vault Passphrase.");
-          isRunning = false;
-          btnStart.textContent = "Start Agent";
-          return;
-        }
-      }
+  async function runAgentTurn(promptText) {
+    const config = await new Promise((resolve) => {
+      chrome.storage.local.get([
+        "apiKey", "encryptedKey", "model", "baseUrl", "speed", "domainLock", "bypassHoneypot", "goCrazy", "routingRules", "githubToken"
+      ], resolve);
+    });
 
-      if (!apiKey) {
-        writeLog("Error: No API key found. Open settings and save your key.");
-        isRunning = false;
-        btnStart.textContent = "Start Agent";
-        return;
-      }
+    let apiKey = config.apiKey || DEFAULT_KEY;
 
-      const savedState = await new Promise((resolve) => {
-        chrome.storage.local.get(["activeAgentState"], (res) => resolve(res.activeAgentState));
-      });
+    const session = agentsList[activeAgentIndex];
 
+    // Create or retain existing agent session for stateful memory
+    if (!activeAgent) {
       activeAgent = new ChromeAgent(
         apiKey,
         config.model,
@@ -421,91 +735,105 @@ document.addEventListener("DOMContentLoaded", async () => {
         { 
           ...config, 
           isCancelled: () => !isRunning,
-          history: (savedState && savedState.prompt === promptText) ? savedState.history : []
+          history: session.history || [],
+          targetTabId: session.targetTabId || null
         }
       );
-      if (savedState && savedState.prompt === promptText) {
-        activeAgent.activeModel = savedState.activeModel;
-        writeLog("[Session Resumed] Restored agent execution history.");
-      }
-
-      const mode = runModePlan.checked ? "plan" : "auto";
-      activeAgent.currentMode = mode;
-
-      // Sync Go Crazy Mode flag with page sessionStorage
-      const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-      if (activeTab) {
-        try {
-          await chrome.scripting.executeScript({
-            target: { tabId: activeTab.id },
-            args: [!!config.goCrazy],
-            func: (val) => {
-              sessionStorage.setItem('goCrazy', val ? 'true' : 'false');
-            }
-          });
-        } catch(e) {}
-      }
-
-      try {
-        const result = await activeAgent.runPrompt(promptText, mode);
-        
-        // Sync log with local server
-        await syncLogToServer({
-          timestamp: Date.now(),
-          prompt: promptText,
-          action: activeAgent.pendingAction ? activeAgent.pendingAction.action : "step_execution",
-          model: activeAgent.activeModel,
-          logs: logConsole.textContent.slice(-1000),
-          screenshot: activeAgent.lastScreenshot || null,
-          status: "success"
-        });
-
-        if (result === "aborted") {
-          isRunning = false;
-          btnStart.textContent = "Start Agent";
-          return;
-        }
-        if (result === "finish") {
-          queue.shift();
-          chrome.storage.local.set({ queue });
-          renderQueue();
-          writeLog(">>> Task complete! Moving to next queue item.");
-          
-          // Display screenshot link if captured
-          if (activeAgent.lastScreenshot) {
-            writeLog(`[Finished Screenshot Captured]`);
-            logsMarkdown += `\n\n![Screenshot](${activeAgent.lastScreenshot})`;
-          }
-        }
-      } catch (err) {
-        writeLog(`Stopped loop due to error: ${err.message}`);
-        
-        // Sync failure log with local server
-        await syncLogToServer({
-          timestamp: Date.now(),
-          prompt: promptText,
-          action: "error_catch",
-          logs: logConsole.textContent.slice(-1000),
-          status: "error",
-          errorMessage: err.message
-        });
-
-        isRunning = false;
-        btnStart.textContent = "Start Agent";
-        return;
-      }
+    } else {
+      // Append new message manually if the agent is already instantiated
+      activeAgent.history.push({
+        role: "user",
+        content: promptText
+      });
     }
 
-    if (queue.length === 0) {
-      writeLog("\nAll queued tasks have finished.");
+    const mode = runModeSelect.value;
+    activeAgent.currentMode = mode;
+
+    try {
+      let result = await activeAgent.runPrompt(promptText, mode);
+      
+      while (isRunning) {
+        if (result === "chat_response") {
+          if (activeAgent.lastMessage) {
+            appendAgentBubble(activeAgent.lastMessage);
+          }
+          isRunning = false;
+          btnKill.classList.add("hidden");
+          btnStart.innerHTML = "↑";
+          
+          session.history = activeAgent.history;
+          session.targetTabId = activeAgent.targetTabId;
+          session.logsMarkdown = logsMarkdown;
+          saveSessionsToStorage();
+          break;
+        }
+        if (result === "finish") {
+          if (activeAgent.lastMessage) {
+            appendAgentBubble(activeAgent.lastMessage);
+          } else {
+            appendAgentBubble("Task completed!");
+          }
+          
+          session.history = activeAgent.history;
+          session.targetTabId = activeAgent.targetTabId;
+          session.logsMarkdown = logsMarkdown;
+          saveSessionsToStorage();
+
+          if (promptQueue.length > 0) {
+            const nextPrompt = promptQueue.shift();
+            appendSystemBubble(`Starting next queued prompt: "${nextPrompt}"`);
+            
+            // Clear current agent state to create a fresh new instance for the next prompt
+            activeAgent = null;
+            setTimeout(() => runAgentTurn(nextPrompt), 1000);
+          } else {
+            isRunning = false;
+            btnKill.classList.add("hidden");
+            btnStart.innerHTML = "↑";
+          }
+          break;
+        }
+        if (result === "pending_approval" || result === "aborted") {
+          isRunning = false;
+          btnKill.classList.add("hidden");
+          btnStart.innerHTML = "↑";
+          
+          session.history = activeAgent.history;
+          session.targetTabId = activeAgent.targetTabId;
+          session.logsMarkdown = logsMarkdown;
+          saveSessionsToStorage();
+          break;
+        }
+      }
+      
+      // Sync log
+      try {
+        await syncLogToServer({
+          timestamp: Date.now(),
+          prompt: promptText,
+          action: activeAgent.pendingAction ? activeAgent.pendingAction.action : "step_complete",
+          status: "success"
+        });
+      } catch(e) {}
+    } catch (err) {
+      appendSystemBubble(`Stopped due to error: ${err.message}`);
       isRunning = false;
-      btnStart.textContent = "Start Agent";
-      btnStart.classList.add("btn-gold");
-      btnStart.classList.remove("btn-indigo");
+      btnKill.classList.add("hidden");
+      btnStart.innerHTML = "↑";
+      try {
+        await syncLogToServer({
+          timestamp: Date.now(),
+          prompt: promptText,
+          action: "error",
+          status: "failure",
+          message: err.message
+        });
+      } catch(e) {}
     }
   }
 
-  // Interactive Plan Handlers
+  // Interactive Plan Handlers (Approval Mode)
   function handleApprovalRequired(plan) {
     planPanel.classList.remove("hidden");
     planTextarea.value = JSON.stringify(plan, null, 2);
@@ -515,52 +843,56 @@ document.addEventListener("DOMContentLoaded", async () => {
     planPanel.classList.add("hidden");
     if (activeAgent) {
       try {
-        // Parse the edited JSON textarea plan
         const editedPlan = JSON.parse(planTextarea.value);
         activeAgent.pendingAction = editedPlan;
 
         const res = await activeAgent.executePending();
         
-        // Sync approved step details with local server
-        await syncLogToServer({
-          timestamp: Date.now(),
-          action: "approve_step",
-          logs: logConsole.textContent.slice(-1000),
-          screenshot: activeAgent.lastScreenshot || null,
-          status: "success"
-        });
-
-        if (res === "aborted") {
+        if (res === "chat_response") {
+          appendAgentBubble(activeAgent.lastMessage);
           isRunning = false;
-          btnStart.textContent = "Start Agent";
-          return;
+          btnKill.classList.add("hidden");
+          btnStart.innerHTML = "↑";
+          
+          const session = agentsList[activeAgentIndex];
+          session.history = activeAgent.history;
+          session.targetTabId = activeAgent.targetTabId;
+          session.logsMarkdown = logsMarkdown;
+          saveSessionsToStorage();
         }
-        if (res === "finish") {
-          queue.shift();
-          chrome.storage.local.set({ queue });
-          renderQueue();
-          writeLog(">>> Task complete!");
+        else if (res === "finish") {
+          appendAgentBubble(activeAgent.lastMessage || "Task completed!");
+          isRunning = false;
+          btnKill.classList.add("hidden");
+          btnStart.innerHTML = "↑";
           
-          if (activeAgent.lastScreenshot) {
-            logsMarkdown += `\n\n![Screenshot](${activeAgent.lastScreenshot})`;
-          }
-          
-          if (isRunning) runQueueLoop();
+          const session = agentsList[activeAgentIndex];
+          session.history = activeAgent.history;
+          session.targetTabId = activeAgent.targetTabId;
+          session.logsMarkdown = logsMarkdown;
+          saveSessionsToStorage();
+        }
+        else if (isRunning) {
+          // If we had more steps, keep running
+          btnKill.classList.remove("hidden");
+          btnStart.innerHTML = "⏳";
+          runAgentTurn(activeAgent.currentPrompt);
         }
       } catch (err) {
-        writeLog(`Execution or JSON parse error: ${err.message}`);
+        appendSystemBubble(`Execution or JSON parse error: ${err.message}`);
         isRunning = false;
-        btnStart.textContent = "Start Agent";
+        btnKill.classList.add("hidden");
+        btnStart.innerHTML = "↑";
       }
     }
   });
 
   btnReject.addEventListener("click", () => {
     planPanel.classList.add("hidden");
-    writeLog("Action proposal rejected. Execution paused.");
+    appendSystemBubble("Action proposal rejected. Execution paused.");
     isRunning = false;
-    btnStart.textContent = "Start Agent";
-    activeAgent = null;
+    btnKill.classList.add("hidden");
+    btnStart.innerHTML = "↑";
   });
 
   // Export logs to Markdown
@@ -569,29 +901,95 @@ document.addEventListener("DOMContentLoaded", async () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `agent-execution-log-${Date.now()}.md`;
+    a.download = `agent-chat-log-${Date.now()}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    writeLog("Markdown log report exported successfully.");
+    appendSystemBubble("Logs exported successfully.");
   });
 
-    // Kill Agent Switch
-  btnKill.addEventListener("click", () => {
-    isRunning = false;
-    queue = [];
-    chrome.storage.local.set({ queue });
-    renderQueue();
-    planPanel.classList.add("hidden");
-    btnStart.textContent = "Start Agent";
-    btnStart.classList.add("btn-gold");
-    btnStart.classList.remove("btn-indigo");
-    writeLog("⚠️ AGENT KILLED: Execution terminated and prompt queue cleared.");
-    activeAgent = null;
+  // Manual Tab Grouping
+  btnGroupTabs.addEventListener("click", async () => {
+    appendSystemBubble("Grouping open tabs by domain name...");
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const groups = {};
+    tabs.forEach(tab => {
+      try {
+        if (!tab.url) return;
+        const domain = new URL(tab.url).hostname;
+        if (domain && !domain.startsWith("chrome")) {
+          if (!groups[domain]) groups[domain] = [];
+          groups[domain].push(tab.id);
+        }
+      } catch(e) {}
+    });
+    let groupedCount = 0;
+    for (const [domain, tabIds] of Object.entries(groups)) {
+      if (tabIds.length > 1) {
+        try {
+          const groupId = await chrome.tabs.group({ tabIds });
+          const colors = ["blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"];
+          const randomColor = colors[Math.floor(Math.random() * colors.length)];
+          await chrome.tabGroups.update(groupId, { title: domain, color: randomColor });
+          groupedCount += tabIds.length;
+        } catch(e) {}
+      }
+    }
+    appendSystemBubble(`Successfully grouped ${groupedCount} tabs by domain.`);
   });
+
+  function resetAgentSession() {
+    isRunning = false;
+    promptQueue = []; // Reset queue
+    planPanel.classList.add("hidden");
+    btnKill.classList.add("hidden");
+    btnStart.innerHTML = "↑";
+    
+    // Clear chat UI and reset log markdown
+    chatContainer.innerHTML = `
+      <div class="message-row agent">
+        <div class="chat-bubble agent">
+          Hi! I'm MonkeyPilot. Tell me what you'd like to do, and I'll talk back and coordinate the browser or GitHub API to make it happen! 🐒
+        </div>
+      </div>
+    `;
+    logsMarkdown = "# Execution Logs\n";
+    
+    if (activeAgent) {
+      try {
+        activeAgent.removeStopOverlay();
+      } catch(e) {}
+    }
+
+    activeAgent = null;
+
+    const session = agentsList[activeAgentIndex];
+    session.history = [];
+    session.targetTabId = null;
+    session.logsMarkdown = "# Execution Logs\n";
+    saveSessionsToStorage();
+  }
+
+  // Stop/Kill Agent
+  btnKill.addEventListener("click", resetAgentSession);
 
   function escapeHtml(str) {
+    if (!str) return "";
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  async function syncLogToServer(logData) {
+    try {
+      await fetch("http://localhost:5000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(logData)
+      });
+    } catch(err) {
+      console.warn("Failed to sync log to server:", err);
+    }
   }
 });
