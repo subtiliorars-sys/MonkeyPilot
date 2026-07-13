@@ -6,9 +6,22 @@ import subprocess
 import socketserver
 
 PORT = 5000
-WORKSPACE_ROOT = os.path.dirname(os.path.abspath(__file__))
+WORKSPACE_ROOT = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 LOG_FILE = os.path.join(WORKSPACE_ROOT, "live_test_logs.json")
 SESSIONS_FILE = os.path.join(WORKSPACE_ROOT, "agent_sessions.json")
+
+
+def resolve_workspace_path(rel_path):
+    """Resolve a relative path under WORKSPACE_ROOT, or None if outside the workspace."""
+    if not rel_path or os.path.isabs(rel_path):
+        return None
+    abs_path = os.path.abspath(os.path.join(WORKSPACE_ROOT, rel_path))
+    try:
+        if os.path.commonpath([abs_path, WORKSPACE_ROOT]) != WORKSPACE_ROOT:
+            return None
+    except ValueError:
+        return None
+    return abs_path
 
 # Use ThreadingHTTPServer if available (Python 3.7+), otherwise fallback to custom class
 if hasattr(http.server, "ThreadingHTTPServer"):
@@ -122,8 +135,8 @@ class LogSyncHandler(http.server.BaseHTTPRequestHandler):
                     self.send_json(400, {"status": "error", "message": "Missing 'path' parameter"})
                     return
                 
-                abs_path = os.path.abspath(os.path.join(WORKSPACE_ROOT, rel_path))
-                if not abs_path.startswith(WORKSPACE_ROOT):
+                abs_path = resolve_workspace_path(rel_path)
+                if abs_path is None:
                     self.send_json(403, {"status": "error", "message": "Access Denied: Path outside workspace root"})
                     return
 
@@ -144,8 +157,8 @@ class LogSyncHandler(http.server.BaseHTTPRequestHandler):
                     self.send_json(400, {"status": "error", "message": "Missing 'path' parameter"})
                     return
 
-                abs_path = os.path.abspath(os.path.join(WORKSPACE_ROOT, rel_path))
-                if not abs_path.startswith(WORKSPACE_ROOT):
+                abs_path = resolve_workspace_path(rel_path)
+                if abs_path is None:
                     self.send_json(403, {"status": "error", "message": "Access Denied: Path outside workspace root"})
                     return
 
@@ -192,4 +205,8 @@ class LogSyncHandler(http.server.BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"Starting Local Multi-Threaded MonkeyPilot Server on http://localhost:{PORT} ...")
     server = ServerClass(("localhost", PORT), LogSyncHandler)
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down MonkeyPilot server.")
+        server.shutdown()
