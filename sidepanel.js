@@ -1051,6 +1051,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Stop/Kill Agent
   btnKill.addEventListener("click", resetAgentSession);
 
+  // Soft-stop when the side panel is hidden so browser actions cannot keep
+  // running unattended. Preserves chat history (unlike Stop, which resets).
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden || !isRunning) return;
+    appendSystemBubble("Side panel hid — agent stopped. Send a message to continue.");
+    isRunning = false;
+    promptQueue = [];
+    if (activeAgent) {
+      try {
+        activeAgent.removeStopOverlay();
+      } catch (e) {}
+    }
+  });
+
   function escapeHtml(str) {
     if (!str) return "";
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
