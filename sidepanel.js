@@ -128,14 +128,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderAgentsList();
     restoreActiveAgentSession();
     try {
-      const tipKey = "monkeypilot-first-settings-tip-v1";
+      const tipKey = "monkeypilot-first-settings-tip-v2";
       const seen = localStorage.getItem(tipKey) === "1";
       const hasKey = !!(data.apiKey && String(data.apiKey).trim());
       if (!seen) {
         appendSystemBubble(
           hasKey
-            ? "First open? Domain lock + Approve mode keep tab automation safer — review Settings before long runs."
-            : "First open? Open Settings (⚙), paste your OpenRouter API key, and Save — keys never ship in source."
+            ? "First open? Domain lock + Approve mode keep automation safer. Closing the side panel soft-stops a running agent."
+            : "First open? Settings (⚙) → paste OpenRouter API key → Save. Closing the side panel soft-stops a running agent."
         );
         localStorage.setItem(tipKey, "1");
       }
