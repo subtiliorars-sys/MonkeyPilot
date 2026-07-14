@@ -127,6 +127,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     renderAgentsList();
     restoreActiveAgentSession();
+    try {
+      const tipKey = "monkeypilot-first-settings-tip-v1";
+      const seen = localStorage.getItem(tipKey) === "1";
+      const hasKey = !!(data.apiKey && String(data.apiKey).trim());
+      if (!seen) {
+        appendSystemBubble(
+          hasKey
+            ? "First open? Domain lock + Approve mode keep tab automation safer — review Settings before long runs."
+            : "First open? Open Settings (⚙), paste your OpenRouter API key, and Save — keys never ship in source."
+        );
+        localStorage.setItem(tipKey, "1");
+      }
+    } catch (_) { /* ignore */ }
   });
 
   // Sync header model change
