@@ -4,6 +4,10 @@ MonkeyPilot is a Chrome extension (Manifest V3) that acts as an AI browser co-pi
 
 **[Try the bot-detection playground →](https://subtiliorars-sys.github.io/MonkeyPilot/test_playground.html)** — static test page on GitHub Pages (no extension install). Load the unpacked extension in Chrome for the full side-panel agent.
 
+### First-run tip
+
+Load the unpacked extension, open Settings (gear), paste your **own** OpenRouter API key, and Save before starting an agent run. Keys never ship in source. Domain lock + Approve mode are safer defaults for long automations.
+
 ## Run and verify
 
 **Extension (Chrome)**
