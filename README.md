@@ -2,6 +2,8 @@
 
 MonkeyPilot is a Chrome extension (Manifest V3) that acts as an AI browser co-pilot: it manages tabs and tab groups, runs agent-driven workflows from a side panel, and includes stealth helpers for bot-detection test pages. A small local Python server (`server.py`) syncs agent logs and workspace operations when you need offline tooling alongside the extension.
 
+**[Try the bot-detection playground →](https://subtiliorars-sys.github.io/MonkeyPilot/test_playground.html)** — static test page on GitHub Pages (no extension install). Load the unpacked extension in Chrome for the full side-panel agent.
+
 ## Run and verify
 
 **Extension (Chrome)**

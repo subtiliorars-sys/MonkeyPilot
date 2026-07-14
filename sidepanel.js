@@ -751,6 +751,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || planPanel.classList.contains("hidden")) return;
+    e.preventDefault();
+    btnReject.click();
+  });
+
   async function runAgentTurn(promptText) {
     const config = await new Promise((resolve) => {
       chrome.storage.local.get([
