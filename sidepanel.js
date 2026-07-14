@@ -1,7 +1,8 @@
 // sidepanel.js - Conversational Chat UI & Controller
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const DEFAULT_KEY = "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";
+  // Never ship a real API key in source — paste via Settings (stored locally).
+  const DEFAULT_KEY = "";
   const DEFAULT_MODEL = "auto";
   const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 
@@ -764,7 +765,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       ], resolve);
     });
 
-    let apiKey = config.apiKey || DEFAULT_KEY;
+    let apiKey = (config.apiKey || DEFAULT_KEY || "").trim();
+    if (!apiKey) {
+      appendSystemBubble("Missing OpenRouter API key. Open Settings (⚙), paste your key, and Save.");
+      isRunning = false;
+      btnKill.classList.add("hidden");
+      btnStart.innerHTML = "↑";
+      setHudStatus("ready");
+      return;
+    }
 
     const session = agentsList[activeAgentIndex];
 
