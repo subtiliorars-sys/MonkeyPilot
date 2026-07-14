@@ -213,6 +213,34 @@
       background-color: #090d16;
       padding: 8px 12px;
       border-bottom: 1px solid var(--border-color);
+      gap: 8px;
+    }
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      flex: 1;
+    }
+    .app-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-gold);
+      letter-spacing: 0.02em;
+      line-height: 1.2;
+    }
+    .hud-status {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      line-height: 1.2;
+    }
+    .hud-status.running {
+      color: var(--accent-emerald);
+    }
+    .hud-status.paused,
+    .hud-status.waiting {
+      color: var(--accent-gold);
     }
     .model-select {
       background-color: #1e293b;
@@ -527,6 +555,8 @@
       <!-- Header Panel -->
       <div class="app-header">
         <div class="header-left">
+          <div class="app-title">MonkeyPilot</div>
+          <div id="hud-status" class="hud-status" aria-live="polite">Ready — Enter to send</div>
           <select id="model-select-header" class="model-select" title="Active Model">
             <option value="auto">🐵 Sonnet 4.6 (Auto)</option>
             <option value="anthropic/claude-3.5-sonnet">🐵 Claude 3.5 Sonnet</option>
@@ -629,13 +659,13 @@
             <div class="toolbar-right">
               <button id="btn-teach-workflow" class="toolbar-icon-btn" title="🎙️ Teach MonkeyPilot (Click to record workflow)" style="color: var(--accent-gold);">🎙️ Teach</button>
               <button id="btn-selector-grab" class="toolbar-icon-btn" title="🍌 Grab Element CSS Selector" style="color: var(--accent-gold);">🍌 Grab</button>
-              <button id="btn-kill" class="toolbar-icon-btn hidden" title="🛑 Stop Agent" style="display: none !important;">🛑 Stop</button>
+              <button id="btn-kill" class="toolbar-icon-btn hidden" title="Stop agent (Ctrl+C)" aria-label="Stop agent">🛑 Stop</button>
               <button id="btn-start" class="send-btn" title="Send message" style="display: none;">↑</button>
             </div>
           </div>
         </div>
-        <div class="footer-note">
-          Enter to send • Ctrl+C to abort
+        <div id="footer-hint" class="footer-note">
+          Enter to send • Shift+Enter for new line • Ctrl+C to stop
         </div>
       </div>
     </div>
