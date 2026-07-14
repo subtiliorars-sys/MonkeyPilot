@@ -38,6 +38,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnReject = document.getElementById("btn-reject");
   const chatContainer = document.getElementById("chat-container");
   const btnGroupTabs = document.getElementById("btn-group-tabs");
+  const hudStatus = document.getElementById("hud-status");
+  const footerHint = document.getElementById("footer-hint");
+
+  const HUD_HINTS = {
+    ready: "Enter to send • Shift+Enter for new line • Ctrl+C to stop",
+    running: "Agent running — click Stop or press Ctrl+C to abort",
+    waiting: "Waiting for your approval — review the step above",
+    paused: "Paused — send a new message or switch mode to continue"
+  };
+
+  function setHudStatus(state) {
+    if (!hudStatus) return;
+    hudStatus.classList.remove("running", "paused", "waiting");
+    if (state === "running" || state === "paused" || state === "waiting") {
+      hudStatus.classList.add(state);
+    }
+    const labels = {
+      ready: "Ready — Enter to send",
+      running: "Running — Stop or Ctrl+C to abort",
+      waiting: "Awaiting approval — Approve or Reject above",
+      paused: "Paused — send a new message to continue"
+    };
+    hudStatus.textContent = labels[state] || labels.ready;
+    if (footerHint && HUD_HINTS[state]) {
+      footerHint.textContent = HUD_HINTS[state];
+    }
+  }
 
   // State
   let isRunning = false;
@@ -592,6 +619,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     isRunning = false;
     btnKill.classList.add("hidden");
     btnStart.innerHTML = "↑";
+    setHudStatus("ready");
     planPanel.classList.add("hidden");
     
     // Set target tab to settings if stored
@@ -708,6 +736,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     isRunning = true;
     btnKill.classList.remove("hidden");
     btnStart.innerHTML = "⏳";
+    setHudStatus("running");
     runAgentTurn(promptText);
   });
 
@@ -769,6 +798,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           isRunning = false;
           btnKill.classList.add("hidden");
           btnStart.innerHTML = "↑";
+          setHudStatus("ready");
           
           session.history = activeAgent.history;
           session.targetTabId = activeAgent.targetTabId;
@@ -799,6 +829,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             isRunning = false;
             btnKill.classList.add("hidden");
             btnStart.innerHTML = "↑";
+            setHudStatus("ready");
           }
           break;
         }
@@ -806,6 +837,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           isRunning = false;
           btnKill.classList.add("hidden");
           btnStart.innerHTML = "↑";
+          setHudStatus(result === "pending_approval" ? "waiting" : "ready");
           
           session.history = activeAgent.history;
           session.targetTabId = activeAgent.targetTabId;
@@ -829,6 +861,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       isRunning = false;
       btnKill.classList.add("hidden");
       btnStart.innerHTML = "↑";
+      setHudStatus("ready");
       try {
         await syncLogToServer({
           timestamp: Date.now(),
@@ -845,6 +878,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function handleApprovalRequired(plan) {
     planPanel.classList.remove("hidden");
     planTextarea.value = JSON.stringify(plan, null, 2);
+    setHudStatus("waiting");
   }
 
   btnApprove.addEventListener("click", async () => {
@@ -861,6 +895,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           isRunning = false;
           btnKill.classList.add("hidden");
           btnStart.innerHTML = "↑";
+          setHudStatus("ready");
           
           const session = agentsList[activeAgentIndex];
           session.history = activeAgent.history;
@@ -873,6 +908,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           isRunning = false;
           btnKill.classList.add("hidden");
           btnStart.innerHTML = "↑";
+          setHudStatus("ready");
           
           const session = agentsList[activeAgentIndex];
           session.history = activeAgent.history;
@@ -884,6 +920,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           // If we had more steps, keep running
           btnKill.classList.remove("hidden");
           btnStart.innerHTML = "⏳";
+          setHudStatus("running");
           runAgentTurn(activeAgent.currentPrompt);
         }
       } catch (err) {
@@ -891,6 +928,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         isRunning = false;
         btnKill.classList.add("hidden");
         btnStart.innerHTML = "↑";
+        setHudStatus("ready");
       }
     }
   });
@@ -901,6 +939,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     isRunning = false;
     btnKill.classList.add("hidden");
     btnStart.innerHTML = "↑";
+    setHudStatus("paused");
   });
 
   // Export logs to Markdown
@@ -954,6 +993,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     planPanel.classList.add("hidden");
     btnKill.classList.add("hidden");
     btnStart.innerHTML = "↑";
+    setHudStatus("ready");
     
     // Clear chat UI and reset log markdown
     chatContainer.innerHTML = `
